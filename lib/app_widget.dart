@@ -1,10 +1,12 @@
 // lib/app_widget.dart
 import 'package:flutter/material.dart';
-import 'features/home/home_page.dart';
-import 'core/models/settings_model.dart'; // Importa o modelo
+import 'package:flutter/services.dart';
+import 'core/navigation/main_navigation.dart';
+import 'core/models/settings_model.dart';
+import 'core/theme/app_theme.dart' as theme;
 
 class GiphyRandomApp extends StatelessWidget {
-  final Settings settings; // Recebe as configurações
+  final Settings settings;
 
   const GiphyRandomApp({super.key, required this.settings});
 
@@ -17,22 +19,21 @@ class GiphyRandomApp extends StatelessWidget {
       AppTheme.system => ThemeMode.system,
     };
 
+    // Configura a UI do sistema (status bar, etc)
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+    );
+
     return MaterialApp(
-      title: 'Buscador aleatório de GIF 2.0',
+      title: 'GIF Gallery',
       debugShowCheckedModeBanner: false,
-      // Aplica o tema
       themeMode: themeMode,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        colorSchemeSeed: Colors.teal,
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: Colors.teal,
-      ),
-      home: const HomePage(),
+      theme: theme.AppTheme.lightTheme,
+      darkTheme: theme.AppTheme.darkTheme,
+      home: const MainNavigation(),
     );
   }
 }

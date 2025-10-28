@@ -1,8 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'app_widget.dart';
-import 'core/models/settings_model.dart'; // Importa o modelo
-import 'core/services/settings_service.dart'; // Importa o serviço
+import 'core/services/settings_service.dart';
 
 void main() async {
   // Garante que os bindings do Flutter foram inicializados
@@ -11,5 +10,5 @@ void main() async {
   // Carrega as configurações antes de rodar o app
   final settings = await SettingsService().loadSettings();
 
-  runApp(GiphyRandomApp(settings: settings)); // Passa as configurações para o widget
+  runApp(GiphyRandomApp(settings: settings));
 }

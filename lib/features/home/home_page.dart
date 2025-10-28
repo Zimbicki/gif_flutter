@@ -1,13 +1,15 @@
 // lib/features/home/home_page.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/models/settings_model.dart'; 
 import '../../core/services/favorites_service.dart';
 import '../../core/services/giphy_service.dart';
 import '../../core/services/settings_service.dart';
-import '../favorites/favorites_page.dart';
-import '../settings/settings_page.dart';
+import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/gradient_app_bar.dart';
 import 'widgets/gif_display.dart';
 
 const String _historyKey = 'search_history';
@@ -135,8 +137,10 @@ class _HomePageState extends State<HomePage> {
 
     if (isCurrentlyFavorite) {
       await _favoritesService.removeFavorite(gifId);
+      _snack('Removido dos favoritos');
     } else {
       await _favoritesService.addFavorite(gifData);
+      _snack('Adicionado aos favoritos ❤️');
     }
 
     setState(() {
@@ -146,28 +150,6 @@ class _HomePageState extends State<HomePage> {
         _favoriteIds.add(gifId);
       }
     });
-  }
-
-  Future<void> _navigateToFavorites() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const FavoritesPage()),
-    );
-    _loadFavorites();
-  }
-
-  // Navega para a página de configurações e recarrega ao voltar
-  Future<void> _navigateToSettings() async {
-    final settingsChanged = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (context) => const SettingsPage()),
-    );
-
-    // Se a página de configurações retornou 'true', recarregamos tudo
-    if (settingsChanged == true && mounted) {
-      _loadInitialData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Configurações aplicadas!')),
-      );
-    }
   }
 
   Future<void> _performSearch({String? query}) async {
@@ -217,60 +199,86 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Buscador de GIF 2.0'),
-        actions: [
-          IconButton(
-            tooltip: 'Favoritos',
-            icon: const Icon(Icons.favorite),
-            onPressed: _navigateToFavorites,
-          ),
-          IconButton(
-            tooltip: 'Configurações',
-            icon: const Icon(Icons.settings),
-            onPressed: _navigateToSettings, // <--- ATUALIZADO
-          ),
-        ],
+      appBar: const GradientAppBar(
+        title: '🎬 GIF Gallery',
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildSearchBar(),
-            Expanded(child: _buildContentArea()),
-          ],
+        child: RefreshIndicator(
+          onRefresh: () => _performSearch(),
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              Expanded(child: _buildContentArea()),
+            ],
+          ),
         ),
       ),
+      floatingActionButton: _gifs.isNotEmpty
+          ? FloatingActionButton(
+              onPressed: () => _performSearch(),
+              tooltip: 'Buscar novamente',
+              child: const Icon(Icons.refresh),
+            ).animate().scale(delay: 600.ms)
+          : null,
     );
   }
 
   Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _searchController,
               focusNode: _searchFocusNode,
-              decoration: const InputDecoration(
-                labelText: 'Procurar por GIFs',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: 'Procurar GIFs...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _performSearch(query: '');
+                        },
+                      )
+                    : null,
               ),
               onChanged: _onSearchChanged,
               onSubmitted: (_) => _performSearch(),
             ),
-          ),
-          const SizedBox(width: 8),
-          DropdownButton<String>(
-            value: _rating,
-            onChanged: _onRatingChanged,
-            items: const [
-              DropdownMenuItem(value: 'g', child: Text('G')),
-              DropdownMenuItem(value: 'pg', child: Text('PG')),
-              DropdownMenuItem(value: 'pg-13', child: Text('PG-13')),
-              DropdownMenuItem(value: 'r', child: Text('R')),
-            ],
-          ),
+          ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.2, end: 0),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: DropdownButton<String>(
+              value: _rating,
+              onChanged: _onRatingChanged,
+              underline: const SizedBox(),
+              icon: const Icon(Icons.arrow_drop_down),
+              items: const [
+                DropdownMenuItem(value: 'g', child: Text('G')),
+                DropdownMenuItem(value: 'pg', child: Text('PG')),
+                DropdownMenuItem(value: 'pg-13', child: Text('PG-13')),
+                DropdownMenuItem(value: 'r', child: Text('R')),
+              ],
+            ),
+          ).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideX(begin: 0.2, end: 0),
         ],
       ),
     );
@@ -284,50 +292,81 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHistoryList() {
-    return ListView.builder(
-      itemCount: _searchHistory.length,
-      itemBuilder: (context, index) {
-        final term = _searchHistory[index];
-        return ListTile(
-          leading: const Icon(Icons.history),
-          title: Text(term),
-          onTap: () {
-            _searchController.text = term;
-            _performSearch(query: term);
-          },
-        );
-      },
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(8),
+        itemCount: _searchHistory.length,
+        itemBuilder: (context, index) {
+          final term = _searchHistory[index];
+          return Card(
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: const Icon(Icons.history, size: 20),
+              ),
+              title: Text(term),
+              trailing: IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () {
+                  setState(() {
+                    _searchHistory.removeAt(index);
+                    _saveSearchHistory();
+                  });
+                },
+              ),
+              onTap: () {
+                _searchController.text = term;
+                _performSearch(query: term);
+              },
+            ),
+          )
+              .animate(delay: (index * 50).ms)
+              .fadeIn(duration: 300.ms)
+              .slideX(begin: -0.2, end: 0);
+        },
+      ),
     );
   }
 
   Widget _buildGifGrid() {
     if (!_settingsLoaded) {
-      return const Center(child: CircularProgressIndicator());
+      return const SkeletonLoader();
     }
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SkeletonLoader();
     }
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text('Erro: $_error', textAlign: TextAlign.center),
-        ),
+      return EmptyState(
+        title: 'Oops! Algo deu errado',
+        message: _error!,
+        icon: Icons.error_outline,
+        onAction: () => _performSearch(),
+        actionLabel: 'Tentar novamente',
       );
     }
     if (_gifs.isEmpty) {
-      return const Center(
-        child: Text('Nenhum GIF encontrado.\nTente uma nova busca!'),
+      return EmptyState(
+        title: 'Nenhum GIF encontrado',
+        message: _searchController.text.isEmpty
+            ? 'Digite algo para começar a busca!'
+            : 'Tente outros termos de busca',
+        icon: Icons.search_off,
+        onAction: _searchController.text.isEmpty ? null : () {
+          _searchController.clear();
+          _performSearch(query: '');
+        },
+        actionLabel: 'Limpar busca',
       );
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 200,
         childAspectRatio: 1,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: _gifs.length,
       itemBuilder: (context, index) {

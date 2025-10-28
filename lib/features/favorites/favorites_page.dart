@@ -1,6 +1,10 @@
 // lib/features/favorites/favorites_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/favorites_service.dart';
+import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/gradient_app_bar.dart';
 import '../home/widgets/gif_display.dart';
 
 class FavoritesPage extends StatefulWidget {
@@ -34,44 +38,53 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   Future<void> _toggleFavorite(Map<String, dynamic> gifData) async {
     final gifId = gifData['id'] as String;
-    // Nesta tela, favoritar significa remover da lista
     await _favoritesService.removeFavorite(gifId);
-    // Recarrega a lista para refletir a mudança
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Removido dos favoritos'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+    
     _loadFavorites(); 
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Meus Favoritos'),
+      appBar: const GradientAppBar(
+        title: '❤️ Favoritos',
       ),
-      body: _buildContent(),
+      body: RefreshIndicator(
+        onRefresh: _loadFavorites,
+        child: _buildContent(),
+      ),
     );
   }
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SkeletonLoader();
     }
 
     if (_favoriteGifs.isEmpty) {
-      return const Center(
-        child: Text(
-          'Você ainda não favoritou nenhum GIF.\nToque na estrela ✩ nos GIFs que gostar!',
-          textAlign: TextAlign.center,
-        ),
+      return EmptyState(
+        title: 'Nenhum favorito ainda',
+        message: 'Toque no coração ❤️ nos GIFs\nque você gostar para salvá-los aqui!',
+        icon: Icons.favorite_border,
       );
     }
 
-    // Usamos o mesmo GridView da HomePage para consistência
     return GridView.builder(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 200,
         childAspectRatio: 1,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: _favoriteGifs.length,
       itemBuilder: (context, index) {
@@ -85,11 +98,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
         return GifDisplay(
           url: url,
-          isFavorite: true, // Todos aqui são favoritos
+          isFavorite: true,
           onToggleFavorite: () => _toggleFavorite(gifData),
-          onPing: (_) async {}, // Analytics não é necessário aqui
+          onPing: (_) async {},
         );
       },
-    );
+    ).animate().fadeIn(duration: 400.ms);
   }
 }
